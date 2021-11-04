@@ -1,0 +1,587 @@
+####################################################################################################################
+# Bestvater & Monroe; Sentiment != Stance
+# 4_analysisScript.R
+# R script containing core analysis and producing figures/tables
+####################################################################################################################
+
+# SETUP
+require(ggplot2)
+require(forcats)
+require(dplyr)
+require(stargazer)
+require(MLmetrics)
+require(irr)
+
+theme_set(theme_bw())
+
+PANLightBlue <- '#69B2DA'
+PANDarkBlue <- '#137EC2'
+
+report_results <- function(df, y_true_name, y_pred_name, NA_rule = 'random'){
+  #function calculates F1 scores over N folds, with different rules for missing values
+  folds <- unique(df$fold)
+  metrics <- c()
+  for(i in 1:length(folds)){
+    fold <- folds[i]
+    fold_df <- df[df$fold == fold, ]
+    rownames(fold_df) <- 1:nrow(fold_df)
+    y_true <- fold_df[, y_true_name]
+    if(NA_rule == 'drop'){
+      y_pred <- fold_df[, y_pred_name]
+    }else if(NA_rule == 'random'){
+      y_pred <- c()
+      for(j in 1:nrow(fold_df)){
+        pred <- fold_df[j, y_pred_name]
+        if(is.na(pred)){
+          y_pred <- c(y_pred, sample(unique(y_true), 1, replace = T))
+        }else{
+          y_pred <- c(y_pred, pred)
+        }
+      }
+    }else if(NA_rule == 'strict'){
+      y_pred <- c()
+      for(j in 1:nrow(fold_df)){
+        pred <- fold_df[j, y_pred_name]
+        if(is.na(pred)){
+          opposite <- ifelse(fold_df[j, y_true_name]==1, 0, 1)
+          y_pred <- c(y_pred, opposite)
+        }else{
+          y_pred <- c(y_pred, pred)
+        }
+      }
+    }else{
+      print('Incorrect value supplied for NA rule. Defaulting to random')
+      y_pred <- fold_df[, y_pred_name]
+    }
+    F1 <- MLmetrics::F1_Score(y_true, y_pred)
+    metrics <- c(metrics, F1)
+  }
+  return(metrics)
+}
+
+random_fill_NA <- function(input_var){
+  output_var <- c()
+  for(i in 1:length(input_var)){
+    obs <- input_var[i]
+    if(is.na(obs)){
+      output_var <- c(output_var, sample(unique(input_var), 1, replace = T))
+    }else{
+      output_var <- c(output_var, obs)
+    }
+  }
+  return(output_var)
+}
+
+se <- function(x) sd(x)/sqrt(length(x))
+
+####################################################################################################################
+# WOMEN'S MARCH REPLICATION/EXTENSION
+
+wm_corpus <- read.csv('./../data/FelmleeEtAl_corpus.csv', stringsAsFactors = F)
+
+# produce figure 1
+plot_df <- wm_corpus[wm_corpus$place %in% c('washington', 'nyc', 'boston', 'losangeles', 'chicago', 'denver'), ]
+plot_df$sentiment <- ifelse(plot_df$sentiment_untargeted > 0, 'positive', NA)
+plot_df$sentiment <- ifelse(plot_df$sentiment_untargeted < 0, 'negative', plot_df$sentiment)
+plot_df$stance <- ifelse(plot_df$bert_stance == 1, 'positive', 'negative')
+plot_df <- plot_df %>% 
+  select(place, sentiment, stance, sentiment_untargeted) %>%
+  mutate(sentiment = fct_relevel(sentiment, 'positive', 'negative'),
+         place = fct_relevel(place, 'washington', 'nyc', 'boston', 'losangeles', 'chicago', 'denver'))
+
+plot_df$place = factor(plot_df$place, 
+                       levels = c('washington', 'nyc', 'boston', 'losangeles', 'chicago', 'denver'),
+                       labels = c('Washington', 'New York City', 'Boston', 'Los Angeles', 'Chicago', 'Denver'))
+
+ggplot(data = plot_df, aes(place, sentiment_untargeted))+
+  geom_boxplot(fill = PANLightBlue)+
+  labs(y = 'Sentiment', x = NULL)
+
+ggsave('./../figures/F1.pdf', width = 8, height = 3, units = 'in', dpi = 600)
+
+# produce counts for table 1
+wm_handcoded <- read.csv('./../data/WM_tweets_groundtruth.csv')
+table(wm_handcoded$stance, wm_handcoded$sentiment)
+sum(table(wm_handcoded$stance, wm_handcoded$sentiment))
+cor.test(wm_handcoded$stance, wm_handcoded$sentiment)
+
+# produce split counts for appendix (Table A3)
+wm_handcoded$moderate_sent <- ifelse(wm_handcoded$vader_scores > 0.5, 0, 1)
+wm_handcoded$moderate_sent <- ifelse(wm_handcoded$vader_scores < -0.5, 0, wm_handcoded$moderate_sent)
+table(wm_handcoded$stance[wm_handcoded$moderate_sent == 1], wm_handcoded$sentiment[wm_handcoded$moderate_sent == 1])
+cor.test(wm_handcoded$stance[wm_handcoded$moderate_sent == 1], wm_handcoded$sentiment[wm_handcoded$moderate_sent == 1])
+
+table(wm_handcoded$stance[wm_handcoded$moderate_sent == 0], wm_handcoded$sentiment[wm_handcoded$moderate_sent == 0])
+cor.test(wm_handcoded$stance[wm_handcoded$moderate_sent == 0], wm_handcoded$sentiment[wm_handcoded$moderate_sent == 0])
+
+ # produce figure 2
+plot_df <- plot_df[complete.cases(plot_df), ]
+
+ggplot(data = plot_df, aes(sentiment, stance, group = place))+
+  geom_jitter(alpha = 0.5, color = PANLightBlue)+
+  facet_wrap(facets = vars(place), strip.position = 'bottom')+
+  labs(x = NULL, y = NULL)+
+  scale_x_discrete(position = "top", labels = c('Positive Sentiment', 'Negative Sentiment'))+
+  scale_y_discrete(labels = c('Opposing Stance', 'Approving Stance'))+
+  theme(axis.text.y = element_text(angle = 90, hjust = 0.5))
+
+ggsave('./../figures/F2.pdf', width = 8, height = 6, units = 'in', dpi = 600)
+
+
+# downstream regression; produce figure 3, table 2
+analysis_df <- read.csv('./../data/WM_tweets_analysis_tweetscores.csv', stringsAsFactors = F)
+analysis_df$ideology_score <- ifelse(analysis_df$ideology_score == Inf, 2.5, analysis_df$ideology_score)
+analysis_df$ideology_score <- ifelse(analysis_df$ideology_score == -Inf, -2.5, analysis_df$ideology_score)
+
+m1 <- glm(data = analysis_df, vader_sentiment~ideology_score, family = binomial(link = 'logit'))
+
+m2 <- glm(data = analysis_df, bert_stance~ideology_score, family = binomial(link = 'logit'))
+
+m_ref <- glm(data = analysis_df, stance~ideology_score, family = binomial(link = 'logit'))
+
+# table 2
+stargazer(m1, m2, m_ref, type = 'latex',
+          star.char = c('','',''),
+          notes = '',
+          digits = 2,
+          notes.append = F,
+          dep.var.labels = c('VADER (sent.)', 'BERT (stance)', 'Ground Truth'),
+          #column.labels = c('VADER (sent.)', 'BERT (stance)'),
+          covariate.labels = c('Ideology (lib-cons)'))
+
+oos_ideology_score <- seq(from = -2.5, to = 2.5, length.out = 100)
+
+pred_df1 <- as.data.frame(cbind(oos_ideology_score))
+colnames(pred_df1) <- c('ideology_score')
+preds <- predict(m1, newdata = pred_df1, type = 'response', se.fit = T)
+pred_df1$predprob <- preds$fit
+pred_df1$lwr <- preds$fit - 1.96*preds$se.fit
+pred_df1$upr <- preds$fit + 1.96*preds$se.fit
+pred_df1$model <- 'vader'
+
+pred_df2 <- as.data.frame(cbind(oos_ideology_score))
+colnames(pred_df2) <- c('ideology_score')
+preds <- predict(m2, newdata = pred_df2, type = 'response', se.fit = T)
+pred_df2$predprob <- preds$fit
+pred_df2$lwr <- preds$fit - 1.96*preds$se.fit
+pred_df2$upr <- preds$fit + 1.96*preds$se.fit
+pred_df2$model <- 'bert'
+
+pred_df_ref <- as.data.frame(cbind(oos_ideology_score))
+colnames(pred_df_ref) <- c('ideology_score')
+preds <- predict(m_ref, newdata = pred_df_ref, type = 'response', se.fit = T)
+pred_df_ref$predprob <- preds$fit
+pred_df_ref$lwr <- preds$fit - 1.96*preds$se.fit
+pred_df_ref$upr <- preds$fit + 1.96*preds$se.fit
+pred_df_ref$model <- 'ground truth'
+
+plot_df <- rbind(pred_df1, pred_df2, pred_df_ref)
+
+plot_df$trained_on <- c(rep('sentiment', 100), rep('stance', 100), rep('ground truth', 100))
+
+# VADER sentiment v BERT stance
+plot_df$model <- factor(plot_df$model, 
+                        levels = c('ground truth', 'vader', 'bert'), 
+                        labels = c('Human-coded Stance', 'VADER Sentiment Classifier', 'BERT Stance Classifier'))
+ggplot(data = plot_df, aes(x = ideology_score, y = predprob, group = model))+
+  geom_line(aes(color = model, linetype = model))+
+  scale_color_manual(values = c('grey20', PANLightBlue, PANDarkBlue))+
+  scale_fill_manual(values = c('grey50', PANLightBlue, PANDarkBlue))+
+  scale_linetype_manual(values = c(1, 3, 5))+
+  geom_ribbon(data=plot_df, aes(ymin = lwr, ymax = upr, fill = model), alpha = 0.15)+
+  labs(y = 'Probability of Women\'s March Approval',
+       x = NULL,
+       color = NULL,
+       linetype = NULL,
+       fill = NULL)+ 
+  scale_y_continuous(limits=c(0,1))+
+  scale_x_continuous(breaks = c(-2,-1,0,1,2), 
+                     labels = c('Very Liberal', 'Liberal', 'Moderate', 'Conservative', 'Very Conservative'))+
+  theme(legend.position="bottom")
+ggsave('./../figures/F3.pdf', width = 8, height = 5)
+
+###################################################################################################################
+# MOOD OF THE NATION EXAMPLE
+
+# produce counts for table 3
+MOTN <- read.csv('./../data/MOTN_responses_groundtruth.csv', stringsAsFactors = F)
+table(MOTN$trump_stance_auto, MOTN$qpos)
+sum(table(MOTN$trump_stance_auto, MOTN$qpos))
+cor.test(MOTN$trump_stance_auto, MOTN$qpos)
+
+# produce counts for table A1
+table(MOTN$qpos, useNA = 'ifany')
+table(MOTN$trump_stance_auto, useNA = 'ifany')
+table(MOTN$lexicoder_sentiment, useNA = 'ifany')
+table(MOTN$vader_sentiment, useNA = 'ifany')
+table(MOTN$SVM_sentiment, useNA = 'ifany')
+table(MOTN$SVM_stance, useNA = 'ifany')
+table(MOTN$BERT_sentiment, useNA = 'ifany')
+table(MOTN$BERT_stance, useNA = 'ifany')
+
+# produce split counts for appendix (Table A4)
+MOTN$moderate_sent <- ifelse(MOTN$vader_scores > 0.5, 0, 1)
+MOTN$moderate_sent <- ifelse(MOTN$vader_scores < -0.5, 0, MOTN$moderate_sent)
+table(MOTN$trump_stance_auto[MOTN$moderate_sent == 1], MOTN$qpos[MOTN$moderate_sent == 1])
+cor.test(MOTN$trump_stance_auto[MOTN$moderate_sent == 1], MOTN$qpos[MOTN$moderate_sent == 1])
+
+table(MOTN$trump_stance_auto[MOTN$moderate_sent == 0], MOTN$qpos[MOTN$moderate_sent == 0])
+cor.test(MOTN$trump_stance_auto[MOTN$moderate_sent == 0], MOTN$qpos[MOTN$moderate_sent == 0])
+
+# Compare Classifiers; produce statistics for Table 4, Table A2
+set.seed(101)
+
+res <- report_results(MOTN, 'qpos', 'lexicoder_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'trump_stance_auto', 'lexicoder_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'qpos', 'lexicoder_sentiment', 'drop') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'trump_stance_auto', 'lexicoder_sentiment', 'drop') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'qpos', 'lexicoder_sentiment', 'strict') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'trump_stance_auto', 'lexicoder_sentiment', 'strict') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'qpos', 'vader_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'trump_stance_auto', 'vader_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'qpos', 'vader_sentiment', 'drop') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'trump_stance_auto', 'vader_sentiment', 'drop') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'qpos', 'vader_sentiment', 'strict') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'trump_stance_auto', 'vader_sentiment', 'strict') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'qpos', 'SVM_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'trump_stance_auto', 'SVM_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'qpos', 'BERT_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'trump_stance_auto', 'BERT_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'qpos', 'SVM_stance', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'trump_stance_auto', 'SVM_stance', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'qpos', 'BERT_stance', 'random')
+mean(res)
+se(res)
+
+res <- report_results(MOTN, 'trump_stance_auto', 'BERT_stance', 'random')
+mean(res)
+se(res)
+
+
+# downstream regression; produce Table 5
+
+
+
+
+MOTN$ideo5 <- recode(MOTN$ideo5,
+                            'Very liberal' = 1,
+                            'Liberal' = 2,
+                            'Moderate' = 3,
+                            'Not sure' = 3,
+                            'Conservative' = 4,
+                            'Very conservative' = 5)
+
+m1 <- glm(random_fill_NA(lexicoder_sentiment) ~ ideo5+as.factor(wavenum), data = MOTN, family = binomial(link = "logit"))
+m2 <- glm(random_fill_NA(vader_sentiment) ~ ideo5+as.factor(wavenum), data = MOTN, family = binomial(link = "logit"))
+m3 <- glm(SVM_sentiment ~ ideo5+as.factor(wavenum), data = MOTN, family = binomial(link = "logit"))
+m4 <- glm(BERT_sentiment ~ ideo5+as.factor(wavenum), data = MOTN, family = binomial(link = "logit"))
+m5 <- glm(SVM_stance ~ ideo5+as.factor(wavenum), data = MOTN, family = binomial(link = "logit"))
+m6 <- glm(BERT_stance ~ ideo5+as.factor(wavenum), data = MOTN, family = binomial(link = "logit"))
+m_ref <- glm(trump_stance_auto ~ ideo5+as.factor(wavenum), data = MOTN, family = binomial(link = "logit"))
+
+
+
+stargazer(m1, m2, m3, m4, m5, m6, m_ref, type = 'latex',
+          star.char = c('','',''),
+          notes = '',
+          digits = 2,
+          notes.append = F,
+          omit = 'wavenum',
+          omit.labels = 'Survey Wave FEs',
+          #dep.var.labels = 'Trump Support',
+          dep.var.labels = c('Lexicoder', 'VADER', 'SVM (sent.)', 'BERT (sent.)', 'SVM (stance)', 'BERT (stance)', 'Ground Truth Stance'),
+          covariate.labels = c('Ideology (lib-cons)'))
+
+# produce Figure 4
+oos_ideo5 <- seq(from = 0.5, to = 5.5, length.out = 100)
+oos_wavenum <- rep(12, 100)
+pred_df4 <- as.data.frame(cbind(oos_ideo5, oos_wavenum))
+colnames(pred_df4) <- c('ideo5', 'wavenum')
+preds <- predict(m4, newdata= pred_df4, type = 'response', se.fit = T)
+pred_df4$predprob <- preds$fit
+pred_df4$lwr <- preds$fit - 1.96*preds$se.fit
+pred_df4$upr <- preds$fit + 1.96*preds$se.fit
+pred_df4$model <- 'BERT'
+pred_df4$trained_on <- 'BERT Sentiment Classifier'
+
+pred_df6 <- as.data.frame(cbind(oos_ideo5, oos_wavenum))
+colnames(pred_df6) <- c('ideo5', 'wavenum')
+preds <- predict(m6, newdata= pred_df6, type = 'response', se.fit = T)
+pred_df6$predprob <- preds$fit
+pred_df6$lwr <- preds$fit - 1.96*preds$se.fit
+pred_df6$upr <- preds$fit + 1.96*preds$se.fit
+pred_df6$model <- 'BERT'
+pred_df6$trained_on <- 'BERT Stance Classifier'
+
+pred_df_ref <- as.data.frame(cbind(oos_ideo5, oos_wavenum))
+colnames(pred_df_ref) <- c('ideo5', 'wavenum')
+preds <- predict(m_ref, newdata= pred_df_ref, type = 'response', se.fit = T)
+pred_df_ref$predprob <- preds$fit
+pred_df_ref$lwr <- preds$fit - 1.96*preds$se.fit
+pred_df_ref$upr <- preds$fit + 1.96*preds$se.fit
+pred_df_ref$model <- 'Self-reported Stance'
+pred_df_ref$trained_on <- 'Self-reported Stance'
+
+pred_df <- rbind(pred_df_ref, pred_df4, pred_df6)
+pred_df$trained_on <- factor(pred_df$trained_on, levels = c('Self-reported Stance', 'BERT Sentiment Classifier', 'BERT Stance Classifier'))
+
+ggplot(data = pred_df, aes(x = ideo5, y = predprob, group = trained_on))+
+  geom_line(aes(color = trained_on, linetype = trained_on))+
+  scale_color_manual(values = c('grey20', PANLightBlue, PANDarkBlue))+
+  scale_fill_manual(values = c('grey50', PANLightBlue, PANDarkBlue))+
+  scale_linetype_manual(values = c(1, 3, 5))+
+  geom_ribbon(data=pred_df, aes(ymin = lwr, ymax = upr, fill = trained_on), alpha = 0.15)+
+  labs(y = 'Probability of Trump Approval',
+       x = NULL,
+       color = NULL,
+       linetype = NULL,
+       fill = NULL)+ 
+  scale_y_continuous(limits=c(0,1))+
+  scale_x_continuous(breaks = c(1,2,3,4,5), 
+                     labels = c('Very Liberal', 'Liberal', 'Moderate', 'Conservative', 'Very Conservative'))+
+  theme(legend.position="bottom")
+
+ggsave('./../figures/F4.pdf', width = 8, height=5)
+
+####################################################################################################################
+# Kavanaugh Tweets Example
+
+# produce counts for table 6
+KAV <- read.csv('./../data/kavanaugh_tweets_groundtruth.csv', stringsAsFactors = F)
+table(KAV$stance, KAV$sentiment)
+sum(table(KAV$stance, KAV$sentiment))
+cor.test(KAV$stance, KAV$sentiment)
+
+# produce counts for table A1
+table(KAV$sentiment, useNA = 'ifany')
+table(KAV$stance, useNA = 'ifany')
+table(KAV$lexicoder_sentiment, useNA = 'ifany')
+table(KAV$vader_sentiment, useNA = 'ifany')
+table(KAV$SVM_sentiment, useNA = 'ifany')
+table(KAV$SVM_stance, useNA = 'ifany')
+table(KAV$BERT_sentiment, useNA = 'ifany')
+table(KAV$BERT_stance, useNA = 'ifany')
+
+# produce split counts for appendix (Table A5)
+KAV$moderate_sent <- ifelse(KAV$vader_scores > 0.5, 0, 1)
+KAV$moderate_sent <- ifelse(KAV$vader_scores < -0.5, 0, KAV$moderate_sent)
+table(KAV$stance[KAV$moderate_sent == 1], KAV$sentiment[KAV$moderate_sent == 1])
+cor.test(KAV$stance[KAV$moderate_sent == 1], KAV$sentiment[KAV$moderate_sent == 1])
+
+table(KAV$stance[KAV$moderate_sent == 0], KAV$sentiment[KAV$moderate_sent == 0])
+cor.test(KAV$stance[KAV$moderate_sent == 0], KAV$sentiment[KAV$moderate_sent == 0])
+
+# Compare Classifiers; produce statistics for Table 7, table A2
+set.seed(101)
+
+res <- report_results(KAV, 'sentiment', 'lexicoder_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'stance', 'lexicoder_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'sentiment', 'lexicoder_sentiment', 'drop') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'stance', 'lexicoder_sentiment', 'drop') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'sentiment', 'lexicoder_sentiment', 'strict') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'stance', 'lexicoder_sentiment', 'strict') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'sentiment', 'vader_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'stance', 'vader_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'sentiment', 'vader_sentiment', 'drop') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'stance', 'vader_sentiment', 'drop') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'sentiment', 'vader_sentiment', 'strict') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'stance', 'vader_sentiment', 'strict') # for appendix
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'sentiment', 'SVM_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'stance', 'SVM_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'sentiment', 'BERT_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'stance', 'BERT_sentiment', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'sentiment', 'SVM_stance', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'stance', 'SVM_stance', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'sentiment', 'BERT_stance', 'random')
+mean(res)
+se(res)
+
+res <- report_results(KAV, 'stance', 'BERT_stance', 'random')
+mean(res)
+se(res)
+
+# downstream regression; produce Table 8
+analysis_df <- read.csv('./../data/kavanaugh_tweets_analysis_tweetscores.csv', stringsAsFactors = F)
+analysis_df$ideology_score <- ifelse(analysis_df$ideology_score == Inf, 2.5, analysis_df$ideology_score)
+analysis_df$ideology_score <- ifelse(analysis_df$ideology_score == '#NAME?', -2.5, analysis_df$ideology_score)
+analysis_df$ideology_score <- ifelse(analysis_df$ideology_score == -Inf, -2.5, analysis_df$ideology_score)
+analysis_df$ideology_score <- as.numeric(analysis_df$ideology_score)
+
+m1 <- glm(data = analysis_df, random_fill_NA(lexicoder_sentiment)~ideology_score, family = binomial(link = 'logit'))
+m2 <- glm(data = analysis_df, random_fill_NA(vader_sentiment)~ideology_score, family = binomial(link = 'logit'))
+m3 <- glm(data = analysis_df, SVM_sentiment~ideology_score, family = binomial(link = 'logit'))
+m4 <- glm(data = analysis_df, BERT_sentiment~ideology_score, family = binomial(link = 'logit'))
+m5 <- glm(data = analysis_df, SVM_stance~ideology_score, family = binomial(link = 'logit'))
+m6 <- glm(data = analysis_df, BERT_stance~ideology_score, family = binomial(link = 'logit'))
+m_ref <- glm(data = analysis_df, stance~ideology_score, family = binomial(link = 'logit'))
+
+stargazer(m1, m2, m3, m4, m5, m6, m_ref, type = 'latex',
+          star.char = c('','',''),
+          notes = '',
+          notes.append = F,
+          digits = 2,
+          dep.var.labels = c('Lexicoder', 'VADER', 'SVM (sent.)', 'BERT (sent.)', 'SVM (stance)', 'BERT (stance)', 'Ground Truth'),
+          #column.labels = c('Lexicoder', 'VADER', 'SVM (sent.)', 'BERT (sent.)', 'SVM (stance)', 'BERT (stance)', 'Ground Truth'),
+          covariate.labels = c('Ideology'))
+
+# produce Figure 5
+oos_ideology_score <- seq(from = -2.5, to = 2.5, length.out = 100)
+
+pred_df4 <- as.data.frame(cbind(oos_ideology_score))
+colnames(pred_df4) <- c('ideology_score')
+preds <- predict(m4, newdata = pred_df4, type = 'response', se.fit = T)
+pred_df4$predprob <- preds$fit
+pred_df4$lwr <- preds$fit - 1.96*preds$se.fit
+pred_df4$upr <- preds$fit + 1.96*preds$se.fit
+pred_df4$model <- 'BERT'
+
+pred_df6 <- as.data.frame(cbind(oos_ideology_score))
+colnames(pred_df6) <- c('ideology_score')
+preds <- predict(m6, newdata = pred_df6, type = 'response', se.fit = T)
+pred_df6$predprob <- preds$fit
+pred_df6$lwr <- preds$fit - 1.96*preds$se.fit
+pred_df6$upr <- preds$fit + 1.96*preds$se.fit
+pred_df6$model <- 'BERT'
+
+pred_df_ref <- as.data.frame(cbind(oos_ideology_score))
+colnames(pred_df_ref) <- c('ideology_score')
+preds <- predict(m_ref, newdata= pred_df_ref, type = 'response', se.fit = T)
+pred_df_ref$predprob <- preds$fit
+pred_df_ref$lwr <- preds$fit - 1.96*preds$se.fit
+pred_df_ref$upr <- preds$fit + 1.96*preds$se.fit
+pred_df_ref$model <- 'Ground Truth'
+
+pred_df <- rbind(pred_df4, pred_df6, pred_df_ref)
+
+pred_df$trained_on <- c(rep('BERT Sentiment Classifier', 100), rep('BERT Stance Classifier', 100), rep('Ground Truth Stance', 100))
+pred_df$trained_on <- factor(pred_df$trained_on, 
+                        levels = c('Ground Truth Stance', 'BERT Sentiment Classifier', 'BERT Stance Classifier'),
+                        labels = c('Self-reported Stance', 'BERT Sentiment Classifier', 'BERT Stance Classifier'))
+
+# BERT sentiment v stance
+ggplot(data = pred_df, aes(x = ideology_score, y = predprob, group = trained_on))+
+  geom_line(aes(color = trained_on, linetype = trained_on))+
+  scale_color_manual(values = c('grey20', PANLightBlue, PANDarkBlue))+
+  scale_fill_manual(values = c('grey50', PANLightBlue, PANDarkBlue))+
+  scale_linetype_manual(values = c(1, 3, 5))+
+  geom_ribbon(data=pred_df, aes(ymin = lwr, ymax = upr, fill = trained_on), alpha = 0.15)+
+  labs(y = 'Probability of Kavanaugh Approval',
+       x = NULL,
+       color = NULL,
+       linetype = NULL,
+       fill = NULL)+ 
+  scale_y_continuous(limits=c(0,1))+
+  scale_x_continuous(breaks = c(-2,-1,0,1,2), 
+                     labels = c('Very Liberal', 'Liberal', 'Moderate', 'Conservative', 'Very Conservative'))+
+  theme(legend.position="bottom")
+
+ggsave('./../figures/F5.pdf', width = 8, height=5)
+
