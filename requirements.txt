@@ -1,0 +1,9 @@
+###### Requirements without Version Specifiers ######
+pandas
+numpy
+scikit-learn
+vaderSentiment
+
+###### Requirements with Version Specifiers ######
+transformers == 4.12.3
+simpletransformers == 0.62.4
