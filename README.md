@@ -38,7 +38,7 @@ Follow the instructions in this section if you wish to reproduce the analysis fo
 1. Run `4_analysis.R`
 
 ### Option 2: You want to replicate the results found in the paper by re-training the classifiers used
-Follow the instructions in this section if you wish to replicate the analysis found in the main text and appendix using newly-trained classifiers. A few things are worth noting: first, a CUDA-enabeled GPU is highly recommended here. The code should run on a CPU instance, but it will take a *really* long time. Second, some of the results should be expected to differ slightly from those found in the published article, due to randomness in initializing the models at the training stage.
+Follow the instructions in this section if you wish to replicate the analysis found in the main text and appendix using newly-trained classifiers. A few things are worth noting: first, a CUDA-enabled GPU is highly recommended here. The code should run on a CPU instance, but it will take a *really* long time. Second, some of the results should be expected to differ slightly from those found in the published article, due to randomness in initializing the models at the training stage.
 
 1. Install PyTorch for your system, following the instructions [here](https://pytorch.org/get-started/locally/)
 2. Install the required python packages listed in `requirements.txt` by running `pip install -r requirements.txt` 
