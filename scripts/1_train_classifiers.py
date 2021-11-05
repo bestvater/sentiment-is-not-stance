@@ -5,6 +5,7 @@
 # Bestvater & Monroe; Sentiment != Stance
 # 1_classifiers.py
 # Python script to train various classifiers for sentiment and stance identification
+# Script will save all results in ../data
 ####################################################################################################################
 
 # SETUP
@@ -12,8 +13,6 @@
 import pandas as pd
 import numpy as np
 
-import pickle
-from pathlib import Path
 import string
 import re
 import gc
@@ -21,8 +20,7 @@ import random
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
-from sklearn.model_selection import cross_val_score, GridSearchCV, KFold
-from sklearn.metrics import f1_score, confusion_matrix, accuracy_score, roc_auc_score, recall_score, precision_score
+from sklearn.metrics import f1_score
 
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from simpletransformers.classification import ClassificationModel
@@ -177,7 +175,7 @@ analysis['vader_sentiment_raw'] = vader_scores
 
 
 
-result, model_outputs = model.predict(analysis['text'])
+result, model_outputs = model.predict(list(analysis['text']))
 
 
 
@@ -606,7 +604,7 @@ model = ClassificationModel('bert',
 
 model.train_model(train_df)
 
-result, model_outputs = model.predict(eval_df['text'])
+result, model_outputs = model.predict(list(eval_df['text']))
 
 BERT_sentiment.extend(list(np.argmax(model_outputs, axis = 1)))
 
@@ -653,7 +651,7 @@ model = ClassificationModel('bert',
 
 model.train_model(train_df)
 
-result, model_outputs = model.predict(eval_df['text'])
+result, model_outputs = model.predict(list(eval_df['text']))
 
 BERT_stance.extend(list(np.argmax(model_outputs, axis = 1)))
 
