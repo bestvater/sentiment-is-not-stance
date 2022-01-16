@@ -1,4 +1,35 @@
 
+% Table created by stargazer v.5.2.2 by Marek Hlavac, Harvard University. E-mail: hlavac at fas.harvard.edu
+% Date and time: Sun, Jan 16, 2022 - 14:40:40
+\begin{table}[!htbp] \centering 
+  \caption{} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccccccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{7}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-8} 
+\\[-1.8ex] & Lexicoder & VADER & SVM (sent.) & BERT (sent.) & SVM (stance) & BERT (stance) & Ground Truth Stance \\ 
+\\[-1.8ex] & (1) & (2) & (3) & (4) & (5) & (6) & (7)\\ 
+\hline \\[-1.8ex] 
+ Ideology (lib-cons) & 0.25$^{}$ & 0.24$^{}$ & 0.39$^{}$ & 0.41$^{}$ & 0.81$^{}$ & 0.99$^{}$ & 2.20$^{}$ \\ 
+  & (0.02) & (0.02) & (0.02) & (0.02) & (0.02) & (0.03) & (0.05) \\ 
+  & & & & & & & \\ 
+ Constant & $-$0.84$^{}$ & $-$0.77$^{}$ & $-$1.65$^{}$ & $-$1.65$^{}$ & $-$3.12$^{}$ & $-$3.61$^{}$ & $-$7.22$^{}$ \\ 
+  & (0.11) & (0.10) & (0.10) & (0.10) & (0.12) & (0.13) & (0.20) \\ 
+  & & & & & & & \\ 
+\hline \\[-1.8ex] 
+Survey Wave FEs & Yes & Yes & Yes & Yes & Yes & Yes & Yes \\ 
+\hline \\[-1.8ex] 
+Observations & 5,892 & 5,991 & 7,146 & 7,146 & 7,146 & 7,146 & 7,146 \\ 
+Log Likelihood & $-$3,964.94 & $-$4,067.80 & $-$4,529.57 & $-$4,546.55 & $-$3,880.06 & $-$3,684.33 & $-$2,396.70 \\ 
+Akaike Inf. Crit. & 7,949.89 & 8,155.61 & 9,079.13 & 9,113.09 & 7,780.11 & 7,388.65 & 4,813.41 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{7}{r}{} \\ 
+\end{tabular} 
+\end{table} 
+
 ===============================================================================================================
                                                         Dependent variable:                                    
                     -------------------------------------------------------------------------------------------

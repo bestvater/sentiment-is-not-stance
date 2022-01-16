@@ -304,12 +304,12 @@ classifier_comparison_table <- function(filename, df, sentiment_var, stance_var,
     # check performance on sentiment task
     cat(paste(classifier_list[i], 'predicting sentiment,', tiebreak_method_list[i], 'tiebreak method:\n', sep = ' '))
     res <- report_results(df, sentiment_var, classifier_list[i], tiebreak_method_list[i])
-    cat(paste(round(mean(res), 4), ' (', round(se(res), 4), ')\n\n', sep = ''))
+    cat(paste('Average F1 Score: ', round(mean(res), 4), ' (se = ', round(se(res), 4), ')\n\n', sep = ''))
     
     # check performance on stance task
     cat(paste(classifier_list[i], 'predicting stance,', tiebreak_method_list[i], 'tiebreak method:\n', sep = ' '))
     res <- report_results(df, stance_var, classifier_list[i], tiebreak_method_list[i])
-    cat(paste(round(mean(res), 4), ' (', round(se(res), 4), ')\n\n', sep = ''))
+    cat(paste('Average F1 Score: ', round(mean(res), 4), ' (se = ', round(se(res), 4), ')\n\n', sep = ''))
     
   }
   sink()
@@ -578,4 +578,5 @@ ggplot(data = pred_df, aes(x = ideology_score, y = predprob, group = trained_on)
   theme(legend.position="bottom")
 
 ggsave('./../figures/F5.pdf', width = 8, height=5)
+
 

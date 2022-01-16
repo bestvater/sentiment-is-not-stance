@@ -1,36 +1,36 @@
 lexicoder_sentiment predicting sentiment, random tiebreak method:
-0.6661 (0.0056)
+Average F1 Score: 0.6661 (se = 0.0056)
 
 lexicoder_sentiment predicting stance, random tiebreak method:
-0.6311 (0.0047)
+Average F1 Score: 0.6311 (se = 0.0047)
 
 vader_sentiment predicting sentiment, random tiebreak method:
-0.6516 (0.0042)
+Average F1 Score: 0.6516 (se = 0.0042)
 
 vader_sentiment predicting stance, random tiebreak method:
-0.6202 (0.0071)
+Average F1 Score: 0.6202 (se = 0.0071)
 
 SVM_sentiment predicting sentiment, random tiebreak method:
-0.8313 (0.0043)
+Average F1 Score: 0.8313 (se = 0.0043)
 
 SVM_sentiment predicting stance, random tiebreak method:
-0.7227 (0.0038)
+Average F1 Score: 0.7227 (se = 0.0038)
 
 SVM_stance predicting sentiment, random tiebreak method:
-0.7245 (0.0048)
+Average F1 Score: 0.7245 (se = 0.0048)
 
 SVM_stance predicting stance, random tiebreak method:
-0.8171 (0.0037)
+Average F1 Score: 0.8171 (se = 0.0037)
 
 BERT_sentiment predicting sentiment, random tiebreak method:
-0.8754 (0.0022)
+Average F1 Score: 0.8754 (se = 0.0022)
 
 BERT_sentiment predicting stance, random tiebreak method:
-0.7242 (0.0048)
+Average F1 Score: 0.7242 (se = 0.0048)
 
 BERT_stance predicting sentiment, random tiebreak method:
-0.7416 (0.005)
+Average F1 Score: 0.7416 (se = 0.005)
 
 BERT_stance predicting stance, random tiebreak method:
-0.8541 (0.0027)
+Average F1 Score: 0.8541 (se = 0.0027)
 
