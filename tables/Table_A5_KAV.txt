@@ -1,0 +1,13 @@
+
+===================================================
+                         Negative No Score Positive
+---------------------------------------------------
+Ground Truth Sentiment    2,748      0       912   
+Ground Truth Stance       1,672      0      1,988  
+Lexicoder                 2,240     784      636   
+VADER                     1,954     264     1,442  
+SVM (sentiment-trained)   2,872      0       788   
+SVM (stance-trained)      1,681      0      1,979  
+BERT (sentiment-trained)  2,804      0       856   
+BERT (stance-trained)     1,659      0      2,001  
+---------------------------------------------------

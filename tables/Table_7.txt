@@ -1,0 +1,36 @@
+lexicoder_sentiment predicting sentiment, random tiebreak method:
+0.7904 (0.0042)
+
+lexicoder_sentiment predicting stance, random tiebreak method:
+0.5637 (0.0173)
+
+vader_sentiment predicting sentiment, random tiebreak method:
+0.7525 (0.0039)
+
+vader_sentiment predicting stance, random tiebreak method:
+0.5148 (0.0107)
+
+SVM_sentiment predicting sentiment, random tiebreak method:
+0.943 (0.0028)
+
+SVM_sentiment predicting stance, random tiebreak method:
+0.5934 (0.0073)
+
+SVM_stance predicting sentiment, random tiebreak method:
+0.5843 (0.0072)
+
+SVM_stance predicting stance, random tiebreak method:
+0.9346 (0.0056)
+
+BERT_sentiment predicting sentiment, random tiebreak method:
+0.9549 (0.002)
+
+BERT_sentiment predicting stance, random tiebreak method:
+0.5822 (0.0054)
+
+BERT_stance predicting sentiment, random tiebreak method:
+0.5765 (0.0088)
+
+BERT_stance predicting stance, random tiebreak method:
+0.9379 (0.0022)
+
