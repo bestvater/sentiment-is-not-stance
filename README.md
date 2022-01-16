@@ -27,7 +27,8 @@
   - 2_train_additionalClassifiers.R : full training loop with 5-fold cross-validation for all lexicoder measures in analysis
   - 3_tweetscores.R : generate Barbera (2015) ideology scores
   - 4_analysisScript.R : core analysis, produces all results found in main text and appendix
-- figures/ : all figures included in manuscript
+- figures/ : all figures included in main text and appendix
+- tables/ : all tables included in main text and appendix
 
 
 ## Instructions
