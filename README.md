@@ -5,7 +5,7 @@
 | ---------------------|----------------------------------------|
 | Corresponding Author | Sam Bestvater; sam.bestvater@gmail.com |
 | Co-Author            | Burt Monroe |
-| Date                 | Nov 4, 2021 |
+| Date                 | Jan 16, 2022 |
 | Article              | Sentiment is Not Stance: Target-Aware Opinion Classification for Political Text Analysis  |
 | Journal              | Political Analysis |
 | Purpose              | This document explains how to replicate all results found in the paper and online supplementary materials, as well as to retrain all models used in the analysis. |
