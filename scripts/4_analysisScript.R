@@ -99,20 +99,50 @@ ggplot(data = plot_df, aes(place, sentiment_untargeted))+
 
 ggsave('./../figures/F1.pdf', width = 8, height = 3, units = 'in', dpi = 600)
 
-# produce counts for table 1
-wm_handcoded <- read.csv('./../data/WM_tweets_groundtruth.csv')
-table(wm_handcoded$stance, wm_handcoded$sentiment)
-sum(table(wm_handcoded$stance, wm_handcoded$sentiment))
-cor.test(wm_handcoded$stance, wm_handcoded$sentiment)
 
-# produce split counts for appendix (Table A3)
+# function to produce sentiment/stance correlation tables
+senti_stance_cor_table <- function(v1, v2, filename){
+  t1a <- as.data.frame.matrix(table(v1, v2)) 
+  names(t1a) <- c('Negative Sentiment', 'Positive Sentiment')
+  rownames(t1a) <- c('Opposing Stance', 'Approving Stance')
+  t1a <- rev(t1a)
+  t1a <- t1a[nrow(t1a):1, ]
+  n <- sum(table(v1, v2))
+  rval <- cor.test(v1, v2)$estimate
+  
+  sink(filename)
+  write(stargazer(t1a, summary = F, type = 'text'))
+  cat('\n\n')
+  cat(paste('N = ', n))
+  cat('\n')
+  cat(paste('r = ', round(rval, 2)))
+  sink()
+  
+  system(paste('cat ', filename))
+}
+
+
+
+# produce counts for Table 1
+wm_handcoded <- read.csv('./../data/WM_tweets_groundtruth.csv')
+
+senti_stance_cor_table(wm_handcoded$stance, wm_handcoded$sentiment, './../tables/Table_1.txt')
+
+
+# produce split counts for appendix (Table A7)
 wm_handcoded$moderate_sent <- ifelse(wm_handcoded$vader_scores > 0.5, 0, 1)
 wm_handcoded$moderate_sent <- ifelse(wm_handcoded$vader_scores < -0.5, 0, wm_handcoded$moderate_sent)
-table(wm_handcoded$stance[wm_handcoded$moderate_sent == 1], wm_handcoded$sentiment[wm_handcoded$moderate_sent == 1])
-cor.test(wm_handcoded$stance[wm_handcoded$moderate_sent == 1], wm_handcoded$sentiment[wm_handcoded$moderate_sent == 1])
 
-table(wm_handcoded$stance[wm_handcoded$moderate_sent == 0], wm_handcoded$sentiment[wm_handcoded$moderate_sent == 0])
-cor.test(wm_handcoded$stance[wm_handcoded$moderate_sent == 0], wm_handcoded$sentiment[wm_handcoded$moderate_sent == 0])
+# moderate
+senti_stance_cor_table(wm_handcoded$stance[wm_handcoded$moderate_sent == 1], 
+                       wm_handcoded$sentiment[wm_handcoded$moderate_sent == 1],
+                       './../tables/Table_A7_moderate.txt')
+
+# extreme
+senti_stance_cor_table(wm_handcoded$stance[wm_handcoded$moderate_sent == 0], 
+                       wm_handcoded$sentiment[wm_handcoded$moderate_sent == 0],
+                       './../tables/Table_A7_extreme.txt')
+
 
  # produce figure 2
 plot_df <- plot_df[complete.cases(plot_df), ]
@@ -148,6 +178,18 @@ stargazer(m1, m2, m_ref, type = 'latex',
           dep.var.labels = c('VADER (sent.)', 'BERT (stance)', 'Ground Truth'),
           #column.labels = c('VADER (sent.)', 'BERT (stance)'),
           covariate.labels = c('Ideology (lib-cons)'))
+
+sink('./../tables/Table_2.txt')
+write(stargazer(m1, m2, m_ref, type = 'text',
+          star.char = c('','',''),
+          notes = '',
+          digits = 2,
+          notes.append = F,
+          dep.var.labels = c('VADER (sent.)', 'BERT (stance)', 'Ground Truth'),
+          covariate.labels = c('Ideology (lib-cons)')))
+sink()
+
+
 
 oos_ideology_score <- seq(from = -2.5, to = 2.5, length.out = 100)
 
@@ -205,111 +247,98 @@ ggsave('./../figures/F3.pdf', width = 8, height = 5)
 
 # produce counts for table 3
 MOTN <- read.csv('./../data/MOTN_responses_groundtruth.csv', stringsAsFactors = F)
-table(MOTN$trump_stance_auto, MOTN$qpos)
-sum(table(MOTN$trump_stance_auto, MOTN$qpos))
-cor.test(MOTN$trump_stance_auto, MOTN$qpos)
 
-# produce counts for table A1
-table(MOTN$qpos, useNA = 'ifany')
-table(MOTN$trump_stance_auto, useNA = 'ifany')
-table(MOTN$lexicoder_sentiment, useNA = 'ifany')
-table(MOTN$vader_sentiment, useNA = 'ifany')
-table(MOTN$SVM_sentiment, useNA = 'ifany')
-table(MOTN$SVM_stance, useNA = 'ifany')
-table(MOTN$BERT_sentiment, useNA = 'ifany')
-table(MOTN$BERT_stance, useNA = 'ifany')
+senti_stance_cor_table(MOTN$trump_stance_auto, MOTN$qpos, './../tables/Table_3.txt')
 
-# produce split counts for appendix (Table A4)
+# function to produce label distribution tables in appendix (A5)
+lab_dist_table <- function(DF, sent, stance, filename){
+  t_df <- t(data.frame(
+    as.numeric(table(DF[,sent], useNA = 'always')),
+    as.numeric(table(DF[,stance], useNA = 'always')),
+    as.numeric(table(DF$lexicoder_sentiment, useNA = 'always')),
+    as.numeric(table(DF$vader_sentiment, useNA = 'always')),
+    as.numeric(table(DF$SVM_sentiment, useNA = 'always')),
+    as.numeric(table(DF$SVM_stance, useNA = 'always')),
+    as.numeric(table(DF$BERT_sentiment, useNA = 'always')),
+    as.numeric(table(DF$BERT_stance, useNA = 'always'))
+  ))
+  
+  colnames(t_df) <- c('Negative', 'Positive', 'No Score')
+  rownames(t_df) <- c('Ground Truth Sentiment', 'Ground Truth Stance',
+                      'Lexicoder', 'VADER', 'SVM (sentiment-trained)',
+                      'SVM (stance-trained)', 'BERT (sentiment-trained)',
+                      'BERT (stance-trained)')
+  
+  t_df <- as.data.frame(t_df) %>% select('Negative', 'No Score', 'Positive')
+  
+  capture.output(stargazer(t_df, type = 'text', summary = F), file = filename)
+
+  print(t_df)
+}
+
+# produce counts for table A5 (MOTN half)
+lab_dist_table(MOTN, 'qpos', 'trump_stance_auto', './../tables/Table_A5_MOTN.txt')
+
+# produce split counts for appendix (Table A8)
 MOTN$moderate_sent <- ifelse(MOTN$vader_scores > 0.5, 0, 1)
 MOTN$moderate_sent <- ifelse(MOTN$vader_scores < -0.5, 0, MOTN$moderate_sent)
-table(MOTN$trump_stance_auto[MOTN$moderate_sent == 1], MOTN$qpos[MOTN$moderate_sent == 1])
-cor.test(MOTN$trump_stance_auto[MOTN$moderate_sent == 1], MOTN$qpos[MOTN$moderate_sent == 1])
 
-table(MOTN$trump_stance_auto[MOTN$moderate_sent == 0], MOTN$qpos[MOTN$moderate_sent == 0])
-cor.test(MOTN$trump_stance_auto[MOTN$moderate_sent == 0], MOTN$qpos[MOTN$moderate_sent == 0])
+# moderate
+senti_stance_cor_table(MOTN$trump_stance_auto[MOTN$moderate_sent == 1], 
+                       MOTN$qpos[MOTN$moderate_sent == 1],
+                       './../tables/Table_A8_moderate.txt')
 
-# Compare Classifiers; produce statistics for Table 4, Table A2
+# extreme
+senti_stance_cor_table(MOTN$trump_stance_auto[MOTN$moderate_sent == 0], 
+                       MOTN$qpos[MOTN$moderate_sent == 0],
+                       './../tables/Table_A8_extreme.txt')
+
+# define function to compare classifiers; produce comparison tables
+classifier_comparison_table <- function(filename, df, sentiment_var, stance_var, classifier_list, tiebreak_method_list='all_random'){
+  if(tiebreak_method_list=='all_random'){
+    tiebreak_method_list <- rep('random', length(classifier_list))
+  }
+  
+  sink(filename)
+  for(i in 1:length(classifier_list)){
+    # check performance on sentiment task
+    cat(paste(classifier_list[i], 'predicting sentiment,', tiebreak_method_list[i], 'tiebreak method:\n', sep = ' '))
+    res <- report_results(df, sentiment_var, classifier_list[i], tiebreak_method_list[i])
+    cat(paste(round(mean(res), 4), ' (', round(se(res), 4), ')\n\n', sep = ''))
+    
+    # check performance on stance task
+    cat(paste(classifier_list[i], 'predicting stance,', tiebreak_method_list[i], 'tiebreak method:\n', sep = ' '))
+    res <- report_results(df, stance_var, classifier_list[i], tiebreak_method_list[i])
+    cat(paste(round(mean(res), 4), ' (', round(se(res), 4), ')\n\n', sep = ''))
+    
+  }
+  sink()
+  
+  system(paste('cat ', filename))
+}
+
+
+# produce statistics for Table 4
 set.seed(101)
+classifier_comparison_table('./../tables/Table_4.txt',
+                            MOTN,
+                            'qpos',
+                            'trump_stance_auto',
+                            c('lexicoder_sentiment', 'vader_sentiment', 'SVM_sentiment',
+                              'SVM_stance', 'BERT_sentiment', 'BERT_stance'))
 
-res <- report_results(MOTN, 'qpos', 'lexicoder_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'trump_stance_auto', 'lexicoder_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'qpos', 'lexicoder_sentiment', 'drop') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'trump_stance_auto', 'lexicoder_sentiment', 'drop') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'qpos', 'lexicoder_sentiment', 'strict') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'trump_stance_auto', 'lexicoder_sentiment', 'strict') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'qpos', 'vader_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'trump_stance_auto', 'vader_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'qpos', 'vader_sentiment', 'drop') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'trump_stance_auto', 'vader_sentiment', 'drop') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'qpos', 'vader_sentiment', 'strict') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'trump_stance_auto', 'vader_sentiment', 'strict') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'qpos', 'SVM_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'trump_stance_auto', 'SVM_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'qpos', 'BERT_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'trump_stance_auto', 'BERT_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'qpos', 'SVM_stance', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'trump_stance_auto', 'SVM_stance', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'qpos', 'BERT_stance', 'random')
-mean(res)
-se(res)
-
-res <- report_results(MOTN, 'trump_stance_auto', 'BERT_stance', 'random')
-mean(res)
-se(res)
+# produce statistics for Table A6 (MOTN)
+set.seed(101)
+classifier_comparison_table('./../tables/Table_A6_MOTN.txt',
+                            MOTN,
+                            'qpos',
+                            'trump_stance_auto',
+                            c('lexicoder_sentiment', 'lexicoder_sentiment', 'lexicoder_sentiment',
+                              'vader_sentiment', 'vader_sentiment', 'vader_sentiment',
+                              'SVM_sentiment', 'SVM_stance', 'BERT_sentiment', 'BERT_stance'),
+                            c('random', 'drop', 'strict',
+                              'random', 'drop', 'strict',
+                              'random', 'random', 'random', 'random'))
 
 
 # downstream regression; produce Table 5
@@ -345,6 +374,19 @@ stargazer(m1, m2, m3, m4, m5, m6, m_ref, type = 'latex',
           #dep.var.labels = 'Trump Support',
           dep.var.labels = c('Lexicoder', 'VADER', 'SVM (sent.)', 'BERT (sent.)', 'SVM (stance)', 'BERT (stance)', 'Ground Truth Stance'),
           covariate.labels = c('Ideology (lib-cons)'))
+
+sink('./../tables/Table_5.txt')
+write(stargazer(m1, m2, m3, m4, m5, m6, m_ref, type = 'text',
+          star.char = c('','',''),
+          notes = '',
+          digits = 2,
+          notes.append = F,
+          omit = 'wavenum',
+          omit.labels = 'Survey Wave FEs',
+          #dep.var.labels = 'Trump Support',
+          dep.var.labels = c('Lexicoder', 'VADER', 'SVM (sent.)', 'BERT (sent.)', 'SVM (stance)', 'BERT (stance)', 'Ground Truth Stance'),
+          covariate.labels = c('Ideology (lib-cons)')))
+sink()
 
 # produce Figure 4
 oos_ideo5 <- seq(from = 0.5, to = 5.5, length.out = 100)
@@ -402,111 +444,52 @@ ggsave('./../figures/F4.pdf', width = 8, height=5)
 
 # produce counts for table 6
 KAV <- read.csv('./../data/kavanaugh_tweets_groundtruth.csv', stringsAsFactors = F)
-table(KAV$stance, KAV$sentiment)
-sum(table(KAV$stance, KAV$sentiment))
-cor.test(KAV$stance, KAV$sentiment)
+senti_stance_cor_table(KAV$stance, KAV$sentiment, './../tables/Table_6.txt')
 
-# produce counts for table A1
-table(KAV$sentiment, useNA = 'ifany')
-table(KAV$stance, useNA = 'ifany')
-table(KAV$lexicoder_sentiment, useNA = 'ifany')
-table(KAV$vader_sentiment, useNA = 'ifany')
-table(KAV$SVM_sentiment, useNA = 'ifany')
-table(KAV$SVM_stance, useNA = 'ifany')
-table(KAV$BERT_sentiment, useNA = 'ifany')
-table(KAV$BERT_stance, useNA = 'ifany')
 
-# produce split counts for appendix (Table A5)
+# produce counts for table A5 (KAV half)
+lab_dist_table(KAV, 'sentiment', 'stance', './../tables/Table_A5_KAV.txt')
+
+
+# produce split counts for appendix (Table A9)
 KAV$moderate_sent <- ifelse(KAV$vader_scores > 0.5, 0, 1)
 KAV$moderate_sent <- ifelse(KAV$vader_scores < -0.5, 0, KAV$moderate_sent)
-table(KAV$stance[KAV$moderate_sent == 1], KAV$sentiment[KAV$moderate_sent == 1])
-cor.test(KAV$stance[KAV$moderate_sent == 1], KAV$sentiment[KAV$moderate_sent == 1])
 
-table(KAV$stance[KAV$moderate_sent == 0], KAV$sentiment[KAV$moderate_sent == 0])
-cor.test(KAV$stance[KAV$moderate_sent == 0], KAV$sentiment[KAV$moderate_sent == 0])
 
-# Compare Classifiers; produce statistics for Table 7, table A2
+# moderate
+senti_stance_cor_table(KAV$stance[KAV$moderate_sent == 1], 
+                       KAV$sentiment[KAV$moderate_sent == 1],
+                       './../tables/Table_A9_moderate.txt')
+
+# extreme
+senti_stance_cor_table(KAV$stance[KAV$moderate_sent == 0], 
+                       KAV$sentiment[KAV$moderate_sent == 0],
+                       './../tables/Table_A9_extreme.txt')
+
+
+# produce classifier comparison statistics for Table 7
 set.seed(101)
+classifier_comparison_table('./../tables/Table_7.txt',
+                            KAV,
+                            'sentiment',
+                            'stance',
+                            c('lexicoder_sentiment', 'vader_sentiment', 'SVM_sentiment',
+                              'SVM_stance', 'BERT_sentiment', 'BERT_stance'))
 
-res <- report_results(KAV, 'sentiment', 'lexicoder_sentiment', 'random')
-mean(res)
-se(res)
+# produce classifier comparison statistics for Table A6 (KAV)
+set.seed(101)
+classifier_comparison_table('./../tables/Table_A6_KAV.txt',
+                            KAV,
+                            'sentiment',
+                            'stance',
+                            c('lexicoder_sentiment', 'lexicoder_sentiment', 'lexicoder_sentiment',
+                              'vader_sentiment', 'vader_sentiment', 'vader_sentiment',
+                              'SVM_sentiment', 'SVM_stance', 'BERT_sentiment', 'BERT_stance'),
+                            c('random', 'drop', 'strict',
+                              'random', 'drop', 'strict',
+                              'random', 'random', 'random', 'random'))
 
-res <- report_results(KAV, 'stance', 'lexicoder_sentiment', 'random')
-mean(res)
-se(res)
 
-res <- report_results(KAV, 'sentiment', 'lexicoder_sentiment', 'drop') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'stance', 'lexicoder_sentiment', 'drop') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'sentiment', 'lexicoder_sentiment', 'strict') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'stance', 'lexicoder_sentiment', 'strict') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'sentiment', 'vader_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'stance', 'vader_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'sentiment', 'vader_sentiment', 'drop') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'stance', 'vader_sentiment', 'drop') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'sentiment', 'vader_sentiment', 'strict') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'stance', 'vader_sentiment', 'strict') # for appendix
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'sentiment', 'SVM_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'stance', 'SVM_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'sentiment', 'BERT_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'stance', 'BERT_sentiment', 'random')
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'sentiment', 'SVM_stance', 'random')
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'stance', 'SVM_stance', 'random')
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'sentiment', 'BERT_stance', 'random')
-mean(res)
-se(res)
-
-res <- report_results(KAV, 'stance', 'BERT_stance', 'random')
-mean(res)
-se(res)
 
 # downstream regression; produce Table 8
 analysis_df <- read.csv('./../data/kavanaugh_tweets_analysis_tweetscores.csv', stringsAsFactors = F)
@@ -531,6 +514,17 @@ stargazer(m1, m2, m3, m4, m5, m6, m_ref, type = 'latex',
           dep.var.labels = c('Lexicoder', 'VADER', 'SVM (sent.)', 'BERT (sent.)', 'SVM (stance)', 'BERT (stance)', 'Ground Truth'),
           #column.labels = c('Lexicoder', 'VADER', 'SVM (sent.)', 'BERT (sent.)', 'SVM (stance)', 'BERT (stance)', 'Ground Truth'),
           covariate.labels = c('Ideology'))
+
+sink('./../tables/Table_8.txt')
+write(stargazer(m1, m2, m3, m4, m5, m6, m_ref, type = 'text',
+          star.char = c('','',''),
+          notes = '',
+          notes.append = F,
+          digits = 2,
+          dep.var.labels = c('Lexicoder', 'VADER', 'SVM (sent.)', 'BERT (sent.)', 'SVM (stance)', 'BERT (stance)', 'Ground Truth'),
+          #column.labels = c('Lexicoder', 'VADER', 'SVM (sent.)', 'BERT (sent.)', 'SVM (stance)', 'BERT (stance)', 'Ground Truth'),
+          covariate.labels = c('Ideology')))
+sink()
 
 # produce Figure 5
 oos_ideology_score <- seq(from = -2.5, to = 2.5, length.out = 100)
