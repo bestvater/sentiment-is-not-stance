@@ -36,7 +36,7 @@
 ### Option 1: You want to reproduce the results found in the paper
 Follow the instructions in this section if you wish to reproduce the analysis found in the main text and appendix, without re-training classifiers or re-estimating ideology scores.
 
-1. Run `4_analysis.R`
+1. Run `0_intercoder_reliability_check.ipynb` and `4_analysis.R`
 
 ### Option 2: You want to replicate the results found in the paper by re-training the classifiers used
 Follow the instructions in this section if you wish to replicate the analysis found in the main text and appendix using newly-trained classifiers. A few things are worth noting: first, a CUDA-enabled GPU is highly recommended here. The code should run on a CPU instance, but it will take a *really* long time. Second, some of the results should be expected to differ slightly from those found in the published article, due to randomness in initializing the models at the training stage.
@@ -45,14 +45,14 @@ Follow the instructions in this section if you wish to replicate the analysis fo
 2. Install the required python packages listed in `requirements.txt` by running `pip install -r requirements.txt` 
 3. Run `1_train_classifiers.py`
 4. Run `2_train_additionalClassifiers.R`
-5. Run `4_analysis.R`
+5. Run `0_intercoder_reliability_check.ipynb` and `4_analysis.R`
 
 ### Option 3: You want to replicate the results found in the paper by re-estimating the ideology scores used
 Follow the instructions in this section if you wish to replicate the analysis found in the main text and appendix while re-estimating the ideology scores (from Barbera 2015). Please note: process of estimating these scores is severely bottlenecked by the Twitter v1.1 API rate limits for the `GET friends/ids` endpoint, which permits only 15 requests per 15-minute window with standard access. Estimating an ideology score for a single Twitter user requires at least one request (more if they are following >5000 other users), so re-estimating all of these scores with standard API access could take upwards of 75 hours.
 
 1. Edit `3_tweetscores.R` to include your credentials for the Twitter API
 2. Run `3_tweetscores.R`
-3. Run `4_analysis.R`
+3. Run `0_intercoder_reliability_check.ipynb` and `4_analysis.R`
 
 ## Computational Environment
 
