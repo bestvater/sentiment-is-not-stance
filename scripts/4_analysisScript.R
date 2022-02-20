@@ -294,21 +294,36 @@ senti_stance_cor_table(MOTN$trump_stance_auto[MOTN$moderate_sent == 0],
                        './../tables/Table_A8_extreme.txt')
 
 # define function to compare classifiers; produce comparison tables
-classifier_comparison_table <- function(filename, df, sentiment_var, stance_var, classifier_list, tiebreak_method_list='all_random'){
+classifier_comparison_table <- function(filename, df, sentiment_var, stance_var, classifier_list, tiebreak_method_list='all_random', include_samplesize = FALSE){
   if(tiebreak_method_list=='all_random'){
     tiebreak_method_list <- rep('random', length(classifier_list))
   }
   
   sink(filename)
   for(i in 1:length(classifier_list)){
+    if(include_samplesize == TRUE){
+      if(tiebreak_method_list[i] == 'drop'){
+        preds = df[,classifier_list[i]]
+        N = length(preds[!is.na(preds)])
+        samplesize_text = paste('Total Sample =', N, '\n', sep = ' ')
+      }else{
+        N = nrow(df)
+        samplesize_text = paste('Total Sample =', N, '\n', sep = ' ')
+      }
+    }else{
+      samplesize_text = ''
+    }
+    
     # check performance on sentiment task
     cat(paste(classifier_list[i], 'predicting sentiment,', tiebreak_method_list[i], 'tiebreak method:\n', sep = ' '))
     res <- report_results(df, sentiment_var, classifier_list[i], tiebreak_method_list[i])
+    cat(samplesize_text)
     cat(paste('Average F1 Score: ', round(mean(res), 4), ' (se = ', round(se(res), 4), ')\n\n', sep = ''))
     
     # check performance on stance task
     cat(paste(classifier_list[i], 'predicting stance,', tiebreak_method_list[i], 'tiebreak method:\n', sep = ' '))
     res <- report_results(df, stance_var, classifier_list[i], tiebreak_method_list[i])
+    cat(samplesize_text)
     cat(paste('Average F1 Score: ', round(mean(res), 4), ' (se = ', round(se(res), 4), ')\n\n', sep = ''))
     
   }
@@ -338,7 +353,8 @@ classifier_comparison_table('./../tables/Table_A6_MOTN.txt',
                               'SVM_sentiment', 'SVM_stance', 'BERT_sentiment', 'BERT_stance'),
                             c('random', 'drop', 'strict',
                               'random', 'drop', 'strict',
-                              'random', 'random', 'random', 'random'))
+                              'random', 'random', 'random', 'random'),
+                            include_samplesize = TRUE)
 
 
 # downstream regression; produce Table 5
@@ -470,7 +486,7 @@ senti_stance_cor_table(KAV$stance[KAV$moderate_sent == 0],
 # produce classifier comparison statistics for Table 7
 set.seed(101)
 classifier_comparison_table('./../tables/Table_7.txt',
-                            KAV,
+                            KAV, 
                             'sentiment',
                             'stance',
                             c('lexicoder_sentiment', 'vader_sentiment', 'SVM_sentiment',
@@ -487,7 +503,8 @@ classifier_comparison_table('./../tables/Table_A6_KAV.txt',
                               'SVM_sentiment', 'SVM_stance', 'BERT_sentiment', 'BERT_stance'),
                             c('random', 'drop', 'strict',
                               'random', 'drop', 'strict',
-                              'random', 'random', 'random', 'random'))
+                              'random', 'random', 'random', 'random'),
+                            include_samplesize = TRUE)
 
 
 

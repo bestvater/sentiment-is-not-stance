@@ -375,7 +375,7 @@ MOTN.to_csv('./../data/MOTN_responses_groundtruth.csv', index = False)
 KAV = pd.read_csv('./../data/kavanaugh_tweets_groundtruth.csv')
 random.seed(101)
 KAV['fold'] = random.choices(range(1,6), k = len(KAV))
-KAV = KAV.sort_values(by = 'fold').dropna()
+KAV = KAV.sort_values(by = 'fold')#.dropna(subset = ['text', 'sentiment', 'stance'])
 print(KAV.shape)
 KAV.head()
 
